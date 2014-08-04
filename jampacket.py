@@ -137,7 +137,8 @@ class JamPacketApp(gtk.Window):
 
     def protocol_changed(self, widget):
         self.protocol = widget.get_active_text()
-        if self.protocol == IGMP_QUERY or self.protocol == IGMP_JOIN or self.protocol == IGMP_LEAVE:
+        if (self.protocol == PROTO_IGMP_QUERY or
+                self.protocol == PROTO_IGMP_JOIN or self.protocol == PROTO_IGMP_LEAVE):
             self.lbl_ip.set_text('Multicast IP')
         else:
             self.lbl_ip.set_text('Target IP')
