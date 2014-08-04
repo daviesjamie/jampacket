@@ -31,6 +31,8 @@ class JamPacketApp(gtk.Window):
         cb_proto.append_text('ICMP')
         cb_proto.append_text('IGMP')
 
+        e_ip = gtk.Entry()
+
         table = gtk.Table(4, 2, False)
         table.set_row_spacings(10)
         table.set_col_spacings(10)
@@ -39,6 +41,8 @@ class JamPacketApp(gtk.Window):
         table.attach(cb_iface, 1, 2, 0, 1)
         table.attach(gtk.Label("Protocol"), 0, 1, 1, 2)
         table.attach(cb_proto, 1, 2, 1, 2)
+        table.attach(gtk.Label("IP"), 0, 1, 2, 3)
+        table.attach(e_ip, 1, 2, 2, 3)
 
         self.add(table)
 
