@@ -5,6 +5,7 @@ __version__ = '0.0.1'
 
 import gtk
 import netifaces as ni
+import sys
 
 
 class JamPacketApp(gtk.Window):
@@ -17,6 +18,11 @@ class JamPacketApp(gtk.Window):
         self.set_title('JamPacket v{}'.format(__version__))
         self.set_resizable(False)
         self.set_position(gtk.WIN_POS_CENTER)
+
+        try:
+            self.set_icon_from_file("strawberry.png")
+        except Exception, e:
+            sys.stderr.write(e.message)
 
         cb_iface = gtk.combo_box_new_text()
         cb_iface.connect('changed', self.iface_changed)
