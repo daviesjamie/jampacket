@@ -37,7 +37,12 @@ class JamPacketApp(gtk.Window):
         cb_proto.append_text('ICMP')
         cb_proto.append_text('IGMP')
 
-        e_ip = gtk.Entry()
+        e_target = gtk.Entry()
+        e_target.add_events(gtk.gdk.KEY_RELEASE_MASK)
+        e_target.connect('key-release-event', self.target_changed)
+
+        btn_send = gtk.Button('Send Packet')
+        btn_send.connect('clicked', self.send)
 
         table = gtk.Table(4, 2, False)
         table.set_row_spacings(10)
@@ -48,17 +53,24 @@ class JamPacketApp(gtk.Window):
         table.attach(gtk.Label("Protocol"), 0, 1, 1, 2)
         table.attach(cb_proto, 1, 2, 1, 2)
         table.attach(gtk.Label("IP"), 0, 1, 2, 3)
-        table.attach(e_ip, 1, 2, 2, 3)
+        table.attach(e_target, 1, 2, 2, 3)
+        table.attach(btn_send, 0, 2, 3, 4)
 
         self.add(table)
 
         self.show_all()
 
     def iface_changed(self, widget):
-        print 'Interface changed to {}'.format(widget.get_active_text())
+        self.source = widget.get_active_text().split(' ')[2]
 
     def protocol_changed(self, widget):
-        print 'Changed to {}'.format(widget.get_active_text())
+        self.protocol = widget.get_active_text()
+
+    def target_changed(self, widget, event):
+        self.target = widget.get_text()
+
+    def send(self, widget):
+        print '{} packet sent from {} to {}'.format(self.protocol, self.source, self.target)
 
 
 JamPacketApp()
