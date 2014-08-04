@@ -1,18 +1,31 @@
 #!/usr/bin/env python
 
 __author__  = 'Jamie Davies'
-__version__ = '0.0.1'
+__version__ = '1.0.0'
 
 import gtk
 import netifaces as ni
 import re
+import socket
 import sys
 
-ARP = 'ARP Request'
-ICMP_PING = 'ICMP Echo Request (Ping)'
-IGMP_QUERY = 'IGMP Membership Query'
-IGMP_JOIN = 'IGMPv2 Membership Report'
-IGMP_LEAVE = 'IGMPv2 Leave Group'
+# Disable annoying logging from Scapy
+import logging
+logging.getLogger('scapy.runtime').setLevel(logging.ERROR)
+
+from scapy.all import ARP, Ether, ICMP, IP
+from scapy.contrib.igmp import IGMP
+
+PROTO_ARP        = 'ARP Request'
+PROTO_ICMP_PING  = 'ICMP Echo Request (Ping)'
+PROTO_IGMP_QUERY = 'IGMP Membership Query'
+PROTO_IGMP_JOIN  = 'IGMPv2 Membership Report'
+PROTO_IGMP_LEAVE = 'IGMPv2 Leave Group'
+
+ICMP_PING  = 8
+IGMP_QUERY = 0x11
+IGMP_JOIN  = 0x16
+IGMP_LEAVE = 0x17
 
 
 def is_ip(ip):
@@ -29,6 +42,30 @@ def is_ip(ip):
         if number > 255 or number < 0:
             return False
     return True
+
+
+def create_arp(src_mac, src_ip, dst_ip):
+    """Creates a new ARP packet based on the given addresses."""
+    a = Ether(src=src_mac, dst='ff:ff:ff:ff:ff:ff')
+    b = ARP(hwsrc=src_mac, hwdst='ff:ff:ff:ff:ff:ff', psrc=src_ip, pdst=dst_ip)
+    return a / b
+
+
+def create_icmp(src_mac, src_ip, dst_ip):
+    """Creates a new ICMP packet based on the given addresses."""
+    a = Ether(src=src_mac)
+    b = IP(src=src_ip, dst=dst_ip)
+    c = ICMP(type=ICMP_PING)
+    return a / b / c
+
+
+def create_igmp(src_mac, src_ip, group_ip, igmp_type=IGMP_QUERY):
+    """Creates a new IGMP packet based on the given addresses."""
+    a = Ether(src=src_mac)
+    b = IP(src=src_ip)
+    c = IGMP(type=igmp_type, gaddr=group_ip)
+    c.igmpize(b, a)
+    return a / b / c
 
 
 class JamPacketApp(gtk.Window):
@@ -62,11 +99,11 @@ class JamPacketApp(gtk.Window):
 
         cb_proto = gtk.combo_box_new_text()
         cb_proto.connect('changed', self.protocol_changed)
-        cb_proto.append_text(ARP)
-        cb_proto.append_text(ICMP_PING)
-        cb_proto.append_text(IGMP_QUERY)
-        cb_proto.append_text(IGMP_JOIN)
-        cb_proto.append_text(IGMP_LEAVE)
+        cb_proto.append_text(PROTO_ARP)
+        cb_proto.append_text(PROTO_ICMP_PING)
+        cb_proto.append_text(PROTO_IGMP_QUERY)
+        cb_proto.append_text(PROTO_IGMP_JOIN)
+        cb_proto.append_text(PROTO_IGMP_LEAVE)
 
         self.lbl_ip = gtk.Label("Target IP")
         self.lbl_ip.set_size_request(90, -1)
@@ -112,10 +149,10 @@ class JamPacketApp(gtk.Window):
         else:
             widget.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse('red'))
 
-    def warning_popup(self, message):
+    def popup(self, message_type, message):
         md = gtk.MessageDialog(self,
                                gtk.DIALOG_DESTROY_WITH_PARENT,
-                               gtk.MESSAGE_WARNING,
+                               message_type,
                                gtk.BUTTONS_CLOSE,
                                message)
         md.run()
@@ -123,34 +160,71 @@ class JamPacketApp(gtk.Window):
 
     def send(self, widget):
         if not self.iface:
-            self.warning_popup('You must select a network interface to send from!')
+            self.popup(gtk.MESSAGE_WARNING, 'You must select a network interface to send from!')
             return False
         if not self.protocol:
-            self.warning_popup('You must select a packet protocol!')
+            self.popup(gtk.MESSAGE_WARNING, 'You must select a packet protocol!')
             return False
         if not self.target:
-            self.warning_popup('You must enter a {} address!'.format(self.lbl_ip.get_text()))
+            self.popup(gtk.MESSAGE_WARNING,
+                       'You must enter a {} address!'.format(self.lbl_ip.get_text()))
             return False
         if not is_ip(self.target):
-            self.warning_popup('{} is not a valid IP address!'.format(self.target))
+            self.popup(gtk.MESSAGE_WARNING, '{} is not a valid IP address!'.format(self.target))
             return False
 
-        if self.protocol == ARP:
-            print 'ARP'
-            return
-        if self.protocol == ICMP_PING:
-            print 'ICMP'
-            return
-        if self.protocol == IGMP_QUERY:
-            print 'IGMP type=0x11'
-            return
-        if self.protocol == IGMP_JOIN:
-            print 'IGMP type=0x16'
-            return
-        if self.protocol == IGMP_LEAVE:
-            print 'IGMP type=0x17'
-            return
+        src_mac = ni.ifaddresses(self.iface)[ni.AF_LINK][0]['addr']
+        src_ip  = ni.ifaddresses(self.iface)[ni.AF_INET][0]['addr']
+        dst_ip  = self.target
 
+        try:
+            sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
+            sock.bind((self.iface, 0))
+        except:
+            self.popup(gtk.MESSAGE_ERROR,
+                       'Could not open raw socket for transmission!\n' +
+                       'Are you running this with root privileges?')
+            return False
+
+        if self.protocol == PROTO_ARP:
+            try:
+                sock.sendall(str(create_arp(src_mac, src_ip, dst_ip)))
+            except Exception, e:
+                self.popup(gtk.MESSAGE_ERROR, 'Unable to send packet: {}'.format(e.message))
+                return False
+            return True
+
+        if self.protocol == PROTO_ICMP_PING:
+            try:
+                sock.sendall(str(create_icmp(src_mac, src_ip, dst_ip)))
+            except:
+                self.popup(gtk.MESSAGE_ERROR, 'Unable to send packet: {}'.format(e.message))
+                return False
+            return True
+
+        if self.protocol == PROTO_IGMP_QUERY:
+            try:
+                sock.sendall(str(create_igmp(src_mac, src_ip, dst_ip, igmp_type=IGMP_QUERY)))
+            except:
+                self.popup(gtk.MESSAGE_ERROR, 'Unable to send packet: {}'.format(e.message))
+                return False
+            return True
+
+        if self.protocol == PROTO_IGMP_JOIN:
+            try:
+                sock.sendall(str(create_igmp(src_mac, src_ip, dst_ip, igmp_type=IGMP_JOIN)))
+            except:
+                self.popup(gtk.MESSAGE_ERROR, 'Unable to send packet: {}'.format(e.message))
+                return False
+            return True
+
+        if self.protocol == PROTO_IGMP_LEAVE:
+            try:
+                sock.sendall(str(create_igmp(src_mac, src_ip, dst_ip, igmp_type=IGMP_LEAVE)))
+            except:
+                self.popup(gtk.MESSAGE_ERROR, 'Unable to send packet: {}'.format(e.message))
+                return False
+            return True
 
 JamPacketApp()
 gtk.main()
