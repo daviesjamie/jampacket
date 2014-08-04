@@ -69,6 +69,7 @@ class JamPacketApp(gtk.Window):
         cb_proto.append_text(IGMP_LEAVE)
 
         self.lbl_ip = gtk.Label("Target IP")
+        self.lbl_ip.set_size_request(90, -1)
 
         e_target = gtk.Entry()
         e_target.add_events(gtk.gdk.KEY_RELEASE_MASK)
