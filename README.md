@@ -1,6 +1,6 @@
 # JamPacket
 
-![Strawberry](https://github.com/daviesjamie/jampacket/raw/master/strawberry.png)
+![JamPacket Screenshot](https://github.com/daviesjamie/jampacket/raw/master/screenshot.png)
 
 JamPacket is a small GUI tool that performs a simple task: sending packets.
 
