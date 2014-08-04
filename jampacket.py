@@ -36,10 +36,10 @@ class JamPacketApp(gtk.Window):
     def __init__(self):
         super(JamPacketApp, self).__init__()
 
-        self.target = None
-        self.source = None
         self.iface = None
         self.protocol = None
+        self.source = None
+        self.target = None
 
         self.connect("destroy", gtk.main_quit)
 
@@ -111,23 +111,44 @@ class JamPacketApp(gtk.Window):
         else:
             widget.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse('red'))
 
-    def send(self, widget):
-        if is_ip(self.target):
-            print '{} packet sent from {} ({}) to {}'.format(
-                self.protocol, self.iface, self.source, self.target)
-        else:
-            if self.target:
-                msg = '{} is not a valid IP address'.format(self.target)
-            else:
-                msg = 'You must specify a target IP address!'
+    def warning_popup(self, message):
+        md = gtk.MessageDialog(self,
+                               gtk.DIALOG_DESTROY_WITH_PARENT,
+                               gtk.MESSAGE_WARNING,
+                               gtk.BUTTONS_CLOSE,
+                               message)
+        md.run()
+        md.destroy()
 
-            md = gtk.MessageDialog(self,
-                                   gtk.DIALOG_DESTROY_WITH_PARENT,
-                                   gtk.MESSAGE_WARNING,
-                                   gtk.BUTTONS_CLOSE,
-                                   msg)
-            md.run()
-            md.destroy()
+    def send(self, widget):
+        if not self.iface:
+            self.warning_popup('You must select a network interface to send from!')
+            return False
+        if not self.protocol:
+            self.warning_popup('You must select a packet protocol!')
+            return False
+        if not self.target:
+            self.warning_popup('You must enter a {} address!'.format(self.lbl_ip.get_text()))
+            return False
+        if not is_ip(self.target):
+            self.warning_popup('{} is not a valid IP address!'.format(self.target))
+            return False
+
+        if self.protocol == ARP:
+            print 'ARP'
+            return
+        if self.protocol == ICMP_PING:
+            print 'ICMP'
+            return
+        if self.protocol == IGMP_QUERY:
+            print 'IGMP type=0x11'
+            return
+        if self.protocol == IGMP_JOIN:
+            print 'IGMP type=0x16'
+            return
+        if self.protocol == IGMP_LEAVE:
+            print 'IGMP type=0x17'
+            return
 
 
 JamPacketApp()
