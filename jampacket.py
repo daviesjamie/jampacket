@@ -5,7 +5,28 @@ __version__ = '0.0.1'
 
 import gtk
 import netifaces as ni
+import re
 import sys
+
+ARP = 'ARP Request'
+ICMP_PING = 'ICMP Echo Request (Ping)'
+IGMP_QUERY = 'IGMP Membership Query'
+IGMP_JOIN = 'IGMPv2 Membership Report'
+IGMP_LEAVE = 'IGMPv2 Leave Group'
+
+
+def is_ip(ip):
+    """Takes a string and returns whether is matches a valid IPv4 address."""
+    match = re.match('^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$', ip)
+    if not match:
+        return False
+    quad = []
+    for number in match.groups():
+        quad.append(int(number))
+    for number in quad:
+        if number > 255 or number < 0:
+            return False
+    return True
 
 
 class JamPacketApp(gtk.Window):
@@ -18,6 +39,7 @@ class JamPacketApp(gtk.Window):
         self.set_title('JamPacket v{}'.format(__version__))
         self.set_resizable(False)
         self.set_position(gtk.WIN_POS_CENTER)
+        self.set_border_width(10)
 
         try:
             self.set_icon_from_file("strawberry.png")
@@ -33,9 +55,11 @@ class JamPacketApp(gtk.Window):
 
         cb_proto = gtk.combo_box_new_text()
         cb_proto.connect('changed', self.protocol_changed)
-        cb_proto.append_text('ARP')
-        cb_proto.append_text('ICMP')
-        cb_proto.append_text('IGMP')
+        cb_proto.append_text(ARP)
+        cb_proto.append_text(ICMP_PING)
+        cb_proto.append_text(IGMP_QUERY)
+        cb_proto.append_text(IGMP_JOIN)
+        cb_proto.append_text(IGMP_LEAVE)
 
         e_target = gtk.Entry()
         e_target.add_events(gtk.gdk.KEY_RELEASE_MASK)
@@ -61,6 +85,7 @@ class JamPacketApp(gtk.Window):
         self.show_all()
 
     def iface_changed(self, widget):
+        self.iface = widget.get_active_text().split(' ')[0]
         self.source = widget.get_active_text().split(' ')[2]
 
     def protocol_changed(self, widget):
@@ -68,9 +93,23 @@ class JamPacketApp(gtk.Window):
 
     def target_changed(self, widget, event):
         self.target = widget.get_text()
+        if is_ip(widget.get_text()):
+            widget.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse('green'))
+        else:
+            widget.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse('red'))
 
     def send(self, widget):
-        print '{} packet sent from {} to {}'.format(self.protocol, self.source, self.target)
+        if is_ip(self.target):
+            print '{} packet sent from {} ({}) to {}'.format(
+                self.protocol, self.iface, self.source, self.target)
+        else:
+            md = gtk.MessageDialog(self,
+                                   gtk.DIALOG_DESTROY_WITH_PARENT,
+                                   gtk.MESSAGE_WARNING,
+                                   gtk.BUTTONS_CLOSE,
+                                   '{} is not a valid IP address'.format(self.target))
+            md.run()
+            md.destroy()
 
 
 JamPacketApp()
