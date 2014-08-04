@@ -17,6 +17,8 @@ IGMP_LEAVE = 'IGMPv2 Leave Group'
 
 def is_ip(ip):
     """Takes a string and returns whether is matches a valid IPv4 address."""
+    if not ip:
+        return False
     match = re.match('^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$', ip)
     if not match:
         return False
@@ -33,6 +35,11 @@ class JamPacketApp(gtk.Window):
 
     def __init__(self):
         super(JamPacketApp, self).__init__()
+
+        self.target = None
+        self.source = None
+        self.iface = None
+        self.protocol = None
 
         self.connect("destroy", gtk.main_quit)
 
@@ -61,6 +68,8 @@ class JamPacketApp(gtk.Window):
         cb_proto.append_text(IGMP_JOIN)
         cb_proto.append_text(IGMP_LEAVE)
 
+        self.lbl_ip = gtk.Label("Target IP")
+
         e_target = gtk.Entry()
         e_target.add_events(gtk.gdk.KEY_RELEASE_MASK)
         e_target.connect('key-release-event', self.target_changed)
@@ -76,7 +85,7 @@ class JamPacketApp(gtk.Window):
         table.attach(cb_iface, 1, 2, 0, 1)
         table.attach(gtk.Label("Protocol"), 0, 1, 1, 2)
         table.attach(cb_proto, 1, 2, 1, 2)
-        table.attach(gtk.Label("IP"), 0, 1, 2, 3)
+        table.attach(self.lbl_ip, 0, 1, 2, 3)
         table.attach(e_target, 1, 2, 2, 3)
         table.attach(btn_send, 0, 2, 3, 4)
 
@@ -90,6 +99,10 @@ class JamPacketApp(gtk.Window):
 
     def protocol_changed(self, widget):
         self.protocol = widget.get_active_text()
+        if self.protocol == IGMP_QUERY or self.protocol == IGMP_JOIN or self.protocol == IGMP_LEAVE:
+            self.lbl_ip.set_text('Multicast IP')
+        else:
+            self.lbl_ip.set_text('Target IP')
 
     def target_changed(self, widget, event):
         self.target = widget.get_text()
@@ -103,11 +116,16 @@ class JamPacketApp(gtk.Window):
             print '{} packet sent from {} ({}) to {}'.format(
                 self.protocol, self.iface, self.source, self.target)
         else:
+            if self.target:
+                msg = '{} is not a valid IP address'.format(self.target)
+            else:
+                msg = 'You must specify a target IP address!'
+
             md = gtk.MessageDialog(self,
                                    gtk.DIALOG_DESTROY_WITH_PARENT,
                                    gtk.MESSAGE_WARNING,
                                    gtk.BUTTONS_CLOSE,
-                                   '{} is not a valid IP address'.format(self.target))
+                                   msg)
             md.run()
             md.destroy()
 
