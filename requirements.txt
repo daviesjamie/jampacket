@@ -1,2 +1,2 @@
 netifaces==0.10.4
-scapy==2.2.0-dev
+scapy==2.4.1
